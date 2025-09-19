@@ -4,7 +4,6 @@ local mod = _G.mod
 _G.TL = {}
 local TL = _G.TL
 
-
 -- registry / state / queue
 TL.heartRegistry = {}         -- subtype -> handlerTable
 TL.pendingMorphs = {}         -- queue entries
@@ -13,9 +12,12 @@ TL.roomState = { holyCardGiven = false }
 
 -- helpers
 function TL.HasTaintedLost()
-    for i = 0, Game():GetNumPlayers()-1 do
+    local game = Game()
+    for i = 0, game:GetNumPlayers()-1 do
         local p = Isaac.GetPlayer(i)
-        if p and p:GetPlayerType() == PlayerType.PLAYER_THELOST or p:GetPlayerType() == PlayerType.PLAYER_THELOST_B then return true end
+        if p and (p:GetPlayerType() == PlayerType.PLAYER_THELOST or p:GetPlayerType() == PlayerType.PLAYER_THELOST_B) then
+            return true
+        end
     end
     return false
 end
@@ -96,7 +98,7 @@ function TL.ProcessPendingMorphs()
                 end
             end
 
-            -- call handler to get plan
+            -- call handler to get plan (handler.onMorph should return plan)
             if entry.handler and type(entry.handler.onMorph) == "function" then
                 local ok, plan = pcall(entry.handler.onMorph, entry.pickup, entry.meta)
                 if ok then
@@ -125,6 +127,7 @@ function TL.ClearPendingMorphs()
 end
 
 -- Handle a pickup when it spawns or when scanning a room.
+-- fromScan: boolean (true if called during room scan)
 function TL.HandlePickupInit(pickup, fromScan)
     if not pickup or not pickup:Exists() then return end
     if pickup.Variant ~= PickupVariant.PICKUP_HEART then return end
@@ -134,19 +137,33 @@ function TL.HandlePickupInit(pickup, fromScan)
     local handler = TL.heartRegistry[pickup.SubType]
     if not handler then return end
 
-    if fromScan and handler.onCollision then
+    -- If this pickup type defines onCollision only, do not simulate collision during scan.
+    -- Collision should be handled exclusively by MC_PRE_PICKUP_COLLISION.
+    if fromScan then
+        -- mark room-checked for morph handlers to avoid double-queueing
         local pData = pickup:GetData()
         if pData._tl_roomChecked then return end
         pData._tl_roomChecked = true
-        local player = Isaac.GetPlayer(0)
-        pcall(handler.onCollision, pickup, player)
-            
-        
+
+        -- Only queue morphs when scanning; do NOT call onCollision here.
+        if type(handler.onMorph) == "function" then
+            local meta = {}
+
+            if pickup.SubType == HeartSubType.HEART_SOUL then
+                meta.isFirst = not TL.roomState.holyCardGiven
+                if meta.isFirst then TL.roomState.holyCardGiven = true end
+            end
+
+            TL.QueueMorph(pickup, 30, handler, meta)
+        end
+
         return
     end
 
+    -- non-scan (normal spawn) behavior:
+    -- if handler has onMorph, queue it
     if type(handler.onMorph) == "function" then
-        local meta = meta or {}
+        local meta = {}
 
         if pickup.SubType == HeartSubType.HEART_SOUL then
             meta.isFirst = not TL.roomState.holyCardGiven
@@ -155,6 +172,8 @@ function TL.HandlePickupInit(pickup, fromScan)
 
         TL.QueueMorph(pickup, 30, handler, meta)
     end
+
+    -- if handler has onCollision we leave collision handling to MC_PRE_PICKUP_COLLISION
 end
 
 -- Scan current room for hearts
@@ -189,6 +208,8 @@ mod:AddCallback(ModCallbacks.MC_PRE_PICKUP_COLLISION, function(_, pickup, collid
     if not handler or type(handler.onCollision) ~= "function" then return end
     if not TL.HasTaintedLost() then return end
     local player = collider and collider:ToPlayer()
+    if not player then return end
+
     local pData = pickup:GetData()
     if pData._tl_blackHandled then return end
     pData._tl_blackHandled = true
@@ -196,6 +217,7 @@ mod:AddCallback(ModCallbacks.MC_PRE_PICKUP_COLLISION, function(_, pickup, collid
     pcall(handler.onCollision, pickup, player)
 end)
 
+-- includes
 include("scripts/heartscripts/soul")
 include("scripts/heartscripts/black")
 include("scripts/heartscripts/red")
