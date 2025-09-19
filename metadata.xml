@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+    <name>hearts for lost</name>
+    <directory>hearts for lost</directory>
+    <id>3570655514</id>
+    <description>Ayo! This is my first mod ever for The Binding of Isaac, and it came from pure frustration playing as Tainted Lost. This little guy is hardcore punished just for existing—one hit and it’s game over. Sure, holy cards are supposed to give you a free hit, but after the first one, it feels like they never spawn again.
+
+So I thought: why not give Lost characters a real use for hearts? Here's how it works:
+
+Red Hearts – Turn into coins, keys, bombs, or other goodies depending on the type.
+
+Soul Hearts – First in a batch gives Tainted Lost a Holy Card (for regular Lost, they give keys, bombs, or coins). Extra Soul Hearts give random useful drops.
+
+Black Hearts– Instead of health, they boost a random stat when picked up.
+
+Eternal Hearts – Boom! They turn into chests, either golden or normal.
+
+Rotten Hearts – Summon 6 blue flies or spiders to fight with you. 
+
+Bone Hearts – Become keys or bombs, never coins.
+
+Blended Hearts – A mix of Red and Soul, always giving you a random Tarot card (but never a Holy Card, sorry).
+
+And shops? Don’t worry, hearts won’t clog your store anymore. While playing as Lost or Tainted Lost, hearts are replaced with other items, keeping the shop actually useful.</description>
+    <version>1.1</version>
+    <visibility>Public</visibility>
+    <tag id="Lua"/>
+    <tag id="Pickups"/>
+    <tag id="Player Characters"/>
+    <tag id="Tweaks"/>
+</metadata>
