@@ -52,7 +52,7 @@ TL.RegisterHeartHandler(HeartSubType.YOUR_CUSTOM_HEART, {
 
 ### Notes:
 
-- **`meta` parameter**: Contains contextual info like whether this is the first heart in a batch (`isFirst`). Useful for special logic like giving the first soul heart a holy card.
+- **`meta` parameter**: Contains contextual info. Not being used at the moment.
 - **Morph vs Custom**:
   - **Morph**: Converts the heart into another pickup automatically.
   - **Custom**: Lets you run Lua code, spawn entities, or apply effects. For example, spawning a blue fly or spider for rotten hearts.
