@@ -12,7 +12,7 @@ local rottenHandler = {
                 local rng = p:GetDropRNG()
                 local player = Isaac.GetPlayer()
 
-                local count = 6
+                local count = 3
                 if rng:RandomInt(2) == 0 then
                     for i = 1, count do
                         player:AddBlueFly(p.Position, player)

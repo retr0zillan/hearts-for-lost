@@ -8,7 +8,6 @@ local TL = _G.TL
 TL.heartRegistry = {}         -- subtype -> handlerTable
 TL.pendingMorphs = {}         -- queue entries
 TL.currentFrame = -1
-TL.roomState = { holyCardGiven = false }
 
 -- helpers
 function TL.HasTaintedLost()
@@ -20,6 +19,22 @@ function TL.HasTaintedLost()
         end
     end
     return false
+end
+
+-- utils
+function TL.LuckChance(player, baseChance, scale)
+    local luck = player.Luck
+    local luckFactor
+    if luck >= 0 then
+        luckFactor = math.log(1 + luck) / 5
+    else
+        luckFactor = luck / 50
+    end
+    local chance = baseChance + (scale * luckFactor)
+    if chance < 0 then chance = 0 end
+    if chance > 1 then chance = 1 end
+
+    return chance
 end
 
 -- Register a handler for one or many heart subtypes.
@@ -84,31 +99,30 @@ function TL.ProcessPendingMorphs()
         local p = entry.pickup
 
         if not p or not p:Exists() then
-            -- cleanup flag and remove
             if p and p:GetData() then p:GetData()._tl_queued = nil end
             table.remove(TL.pendingMorphs, i)
         elseif frame >= entry.triggerFrame then
-            local effEnt = Isaac.Spawn(EntityType.ENTITY_EFFECT, EffectVariant.CRACK_THE_SKY, 0, p.Position, Vector.Zero, nil)
-            if effEnt and effEnt:Exists() then
-                local eff = effEnt:ToEffect()
-                if eff then
-                    eff.CollisionDamage = 0
-                    eff:AddEntityFlags(EntityFlag.FLAG_FRIENDLY)
-                    eff.Parent = p
-                end
-            end
-
-            -- call handler to get plan (handler.onMorph should return plan)
+            local plan = nil
             if entry.handler and type(entry.handler.onMorph) == "function" then
-                local ok, plan = pcall(entry.handler.onMorph, entry.pickup, entry.meta)
-                if ok then
-                    TL.ExecutePlan(entry, plan)
-                end
+                local ok, result = pcall(entry.handler.onMorph, entry.pickup, entry.meta)
+                if ok then plan = result end
             end
 
-            sfx:Play(SoundEffect.SOUND_HOLY, 1.0, 0, false, 1.0)
+            if plan then
+                local effEnt = Isaac.Spawn(EntityType.ENTITY_EFFECT, EffectVariant.CRACK_THE_SKY, 0, p.Position, Vector.Zero, nil)
+                if effEnt and effEnt:Exists() then
+                    local eff = effEnt:ToEffect()
+                    if eff then
+                        eff.CollisionDamage = 0
+                        eff:AddEntityFlags(EntityFlag.FLAG_FRIENDLY)
+                        eff.Parent = p
+                    end
+                end
+                sfx:Play(SoundEffect.SOUND_HOLY, 1.0, 0, false, 1.0)
 
-            -- cleanup queued
+                TL.ExecutePlan(entry, plan)
+            end
+
             if p and p:GetData() then p:GetData()._tl_queued = nil end
             table.remove(TL.pendingMorphs, i)
         end
@@ -136,11 +150,7 @@ function TL.HandlePickupInit(pickup, fromScan)
 
     local handler = TL.heartRegistry[pickup.SubType]
     if not handler then return end
-
-    -- If this pickup type defines onCollision only, do not simulate collision during scan.
-    -- Collision should be handled exclusively by MC_PRE_PICKUP_COLLISION.
     if fromScan then
-        -- mark room-checked for morph handlers to avoid double-queueing
         local pData = pickup:GetData()
         if pData._tl_roomChecked then return end
         pData._tl_roomChecked = true
@@ -148,11 +158,6 @@ function TL.HandlePickupInit(pickup, fromScan)
         -- Only queue morphs when scanning; do NOT call onCollision here.
         if type(handler.onMorph) == "function" then
             local meta = {}
-
-            if pickup.SubType == HeartSubType.HEART_SOUL then
-                meta.isFirst = not TL.roomState.holyCardGiven
-                if meta.isFirst then TL.roomState.holyCardGiven = true end
-            end
 
             TL.QueueMorph(pickup, 30, handler, meta)
         end
@@ -164,16 +169,8 @@ function TL.HandlePickupInit(pickup, fromScan)
     -- if handler has onMorph, queue it
     if type(handler.onMorph) == "function" then
         local meta = {}
-
-        if pickup.SubType == HeartSubType.HEART_SOUL then
-            meta.isFirst = not TL.roomState.holyCardGiven
-            if meta.isFirst then TL.roomState.holyCardGiven = true end
-        end
-
         TL.QueueMorph(pickup, 30, handler, meta)
     end
-
-    -- if handler has onCollision we leave collision handling to MC_PRE_PICKUP_COLLISION
 end
 
 -- Scan current room for hearts
@@ -197,7 +194,6 @@ end)
 
 mod:AddCallback(ModCallbacks.MC_POST_NEW_ROOM, function()
     TL.ClearPendingMorphs()
-    TL.roomState = { holyCardGiven = false }
     TL.ScanRoomHearts()
 end)
 
